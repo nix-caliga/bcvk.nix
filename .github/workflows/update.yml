@@ -1,0 +1,86 @@
+name: weekly update
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  update-flake-lock:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Update flake.lock
+        run: nix flake update
+
+      - name: Build and run
+        run: nix run .#bcvk -- --version
+
+      - name: Create PR
+        id: cpr
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: update-flake-lock
+          delete-branch: true
+          title: "flake.lock: update"
+          commit-message: "flake.lock: update"
+          body: Automated `nix flake update`. Build verified with `nix run .#bcvk -- --version`.
+
+      - name: Merge PR
+        if: steps.cpr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --squash --delete-branch
+
+  update-bcvk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Check for new release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current=$(nix eval --raw .#bcvk.version)
+          latest=$(gh api repos/bootc-dev/bcvk/releases/latest --jq .tag_name)
+          latest=${latest#v}
+          echo "current: $current, latest: $latest"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Update bcvk
+        if: steps.check.outputs.current != steps.check.outputs.latest
+        run: nix run nixpkgs#nix-update -- --flake bcvk --version ${{ steps.check.outputs.latest }}
+
+      - name: Build and run
+        id: build
+        if: steps.check.outputs.current != steps.check.outputs.latest
+        continue-on-error: true
+        run: nix run .#bcvk -- --version
+
+      - name: Create PR
+        if: steps.check.outputs.current != steps.check.outputs.latest
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: update-bcvk
+          delete-branch: true
+          title: "bcvk: ${{ steps.check.outputs.current }} -> ${{ steps.check.outputs.latest }}"
+          commit-message: "bcvk: ${{ steps.check.outputs.current }} -> ${{ steps.check.outputs.latest }}"
+          body: |
+            Release notes: https://github.com/bootc-dev/bcvk/releases/tag/v${{ steps.check.outputs.latest }}
+
+            Build: **${{ steps.build.outcome }}**
+
+            If the build failed, `bcvk.patch` likely needs to be rebased onto the new release. See the workflow run logs for details.
