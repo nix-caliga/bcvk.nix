@@ -3,24 +3,24 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-
-    bcvk-src = {
-      url = "github:bootc-dev/bcvk/b2c597d1d6906bc0da57ba90b83b3f35f2525c6d";
-      flake = false;
-    };
   };
 
   outputs =
-    { nixpkgs, bcvk-src, ... }:
+    { nixpkgs, ... }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
 
-      bcvk = pkgs.rustPlatform.buildRustPackage {
+      bcvk = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
         pname = "bcvk";
         version = "0.19.0";
 
-        src = bcvk-src;
+        src = pkgs.fetchFromGitHub {
+          owner = "bootc-dev";
+          repo = "bcvk";
+          tag = "v${finalAttrs.version}";
+          hash = "sha256-Kwt2n5fpZsdD6IoE+J3woZjF0w+y52VxteT2q+f/8KM=";
+        };
 
         patches = [ ./bcvk.patch ];
 
@@ -45,7 +45,7 @@
             }
         '';
 
-        cargoHash = "sha256-VxAtLTtxvJspTHfInSguKLH8W8kZ5Orzd2oH7kv2OG0=";
+        cargoHash = "sha256-ydFJwQ1jtShaP4A+qKqfKRgjPqUAXk59KMJ06vd5jek=";
 
         buildAndTestSubdir = "crates/kit";
         nativeBuildInputs = [
@@ -65,7 +65,7 @@
           ];
           mainProgram = "bcvk";
         };
-      };
+      });
     in
     {
       packages.${system} = {
