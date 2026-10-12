@@ -1,17 +1,17 @@
 diff --git a/crates/kit/scripts/entrypoint.sh b/crates/kit/scripts/entrypoint.sh
-index 06474ff..c95fbd9 100644
+index 3ce06b8..8163d1e 100644
 --- a/crates/kit/scripts/entrypoint.sh
 +++ b/crates/kit/scripts/entrypoint.sh
-@@ -23,6 +23,8 @@ init_tmproot() {
+@@ -26,6 +26,8 @@ init_tmproot() {
      ln -sf usr/sbin sbin
-     mkdir -p {etc,var,dev,proc,run,sys,tmp}
+     mkdir -p {etc,var/tmp,dev,proc,run,sys,tmp}
      # Ensure we have /etc/passwd as ssh-keygen wants it for bad reasons
 +    echo 'root:x:0:0:root:/root:/bin/sh' > etc/passwd
 +    echo 'root:x:0:' > etc/group
      systemd-sysusers --root $(pwd) &>/dev/null
  
      # Copy DNS configuration from container's /etc/resolv.conf (configured by podman --dns)
-@@ -60,6 +62,11 @@ fi
+@@ -63,6 +65,11 @@ fi
  # Check systemd version from the container image (not host)
  export SYSTEMD_VERSION=$(systemctl --version 2>/dev/null)
  
@@ -20,11 +20,11 @@ index 06474ff..c95fbd9 100644
 +    export PATH="$BCVK_NIX_HOST_PATH:$PATH"
 +fi
 +
- # Execute with proper environment passing
- # Set up signal handlers that will cleanly exit on INT or TERM
- trap 'kill -TERM $BWRAP_PID 2>/dev/null; exit 0' INT TERM
+ # container-entrypoint handles SIGTERM/SIGINT itself, so it can just
+ # replace us (as PID 1 for the main invocation).
+ exec chroot "$TMPROOT" "$SELFEXE" container-entrypoint "$@"
 diff --git a/crates/kit/src/libvirt/secureboot.rs b/crates/kit/src/libvirt/secureboot.rs
-index a0b7c10..dbd5717 100644
+index c891be7..7a61fac 100644
 --- a/crates/kit/src/libvirt/secureboot.rs
 +++ b/crates/kit/src/libvirt/secureboot.rs
 @@ -12,7 +12,12 @@ use std::fs;
@@ -41,7 +41,7 @@ index a0b7c10..dbd5717 100644
  
  /// QEMU firmware descriptor executable section
  #[derive(Debug, Deserialize, Serialize)]
-@@ -323,6 +328,8 @@ pub(crate) fn list_firmware_descriptors() -> Result<Vec<Utf8PathBuf>> {
+@@ -327,6 +332,8 @@ pub(crate) fn list_firmware_descriptors() -> Result<Vec<Utf8PathBuf>> {
      let root = Dir::open_ambient_dir("/", cap_std_ext::cap_std::ambient_authority())?;
  
      for dir_path in search_dirs {
@@ -51,10 +51,10 @@ index a0b7c10..dbd5717 100644
          let relative_path = dir_path
              .as_str()
 diff --git a/crates/kit/src/run_ephemeral.rs b/crates/kit/src/run_ephemeral.rs
-index aa7ad76..5ac5429 100644
+index 4e408c9..22faf10 100644
 --- a/crates/kit/src/run_ephemeral.rs
 +++ b/crates/kit/src/run_ephemeral.rs
-@@ -842,11 +842,6 @@ fn prepare_run_command_with_temp(
+@@ -851,11 +851,6 @@ fn prepare_run_command_with_temp(
          // (We don't want all of `/` as that would scope in a lot more)
          "/usr:/run/tmproot/usr:ro",
          "-v",
@@ -66,7 +66,7 @@ index aa7ad76..5ac5429 100644
          &format!("{}:{}", entrypoint_path, ENTRYPOINT),
          "-v",
          &format!("{self_exe}:/run/selfexe:ro"),
-@@ -860,6 +855,19 @@ fn prepare_run_command_with_temp(
+@@ -869,6 +864,19 @@ fn prepare_run_command_with_temp(
          ),
      ]);
  
