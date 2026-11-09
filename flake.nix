@@ -13,13 +13,13 @@
 
       bcvk = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
         pname = "bcvk";
-        version = "0.21.0";
+        version = "0.22.0";
 
         src = pkgs.fetchFromGitHub {
           owner = "bootc-dev";
           repo = "bcvk";
           tag = "v${finalAttrs.version}";
-          hash = "sha256-953dysh/oKBo7WNeHgqHPFRFpuswhjHJdL9Ym4KXZIo=";
+          hash = "sha256-wP9151sOMDF0HHdKCs5WM3IwxogVdKPlF6n3CE090WM=";
         };
 
         patches = [ ./bcvk.patch ];
@@ -45,7 +45,7 @@
             }
         '';
 
-        cargoHash = "sha256-csu0ebEbub+K51TAjdp3fobIdmivkrzcnr62pFhOt9A=";
+        cargoHash = "sha256-BWV/YJz9+a0vbeijEPgWHw/0rHN1y4j3I9LiqKqgPhc=";
 
         buildAndTestSubdir = "crates/kit";
         nativeBuildInputs = [
